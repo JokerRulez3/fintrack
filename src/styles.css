@@ -164,3 +164,8 @@ main { max-width: 1180px; margin: 0 auto; padding: 20px 24px 80px; }
   .tiles { grid-template-columns: 1fr 1fr; }
   .card { padding: 14px 12px; }
 }
+
+th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+th.sortable:hover, th.sortable.on { color: var(--text); }
+th.sortable .arrow { color: var(--border-2); }
+th.sortable.on .arrow { color: var(--accent); }
