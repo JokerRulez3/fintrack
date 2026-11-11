@@ -11,7 +11,31 @@ export default function ProjectsView({ items, setItems, onError }) {
   const [project, setProject] = useState(projects[0]);
   const [section, setSection] = useState('Payments');
   const inProject = items.filter((i) => i.project === project);
-  const list = inProject.filter((i) => i.section === section);
+  const [sort, setSort] = useState({ key: null, dir: 1 }); // key null = original sheet order
+  const list = useMemo(() => {
+    const rows = inProject.filter((i) => i.section === section);
+    if (!sort.key) return rows;
+    const val = (i) => (sort.key === 'label' ? i.label.replace(/\s*-\s*/g, '-') : sort.key === 'date' ? i.date : sort.key === 'payer' ? i.payer : Number(i.amount));
+    return [...rows].sort((a, b) => {
+      const va = val(a), vb = val(b);
+      if (va == null || va === '') return 1; // blanks always last
+      if (vb == null || vb === '') return -1;
+      const c = typeof va === 'number' ? va - vb : String(va).localeCompare(String(vb), 'en', { numeric: true, sensitivity: 'base' });
+      // ties (e.g. many "Monthly payment") fall back to date, then sheet order
+      return sort.dir * (c || String(a.date || '').localeCompare(String(b.date || '')));
+    });
+  }, [inProject, section, sort]);
+  // click: ascending → descending → back to sheet order (amounts start high-to-low)
+  const toggle = (key) => setSort((s) => {
+    const first = key === 'amount' ? -1 : 1;
+    if (s.key !== key) return { key, dir: first };
+    return s.dir === first ? { key, dir: -first } : { key: null, dir: 1 };
+  });
+  const Th = ({ k, children, right }) => (
+    <th className={`sortable ${right ? 'r' : ''} ${sort.key === k ? 'on' : ''}`} onClick={() => toggle(k)} aria-sort={sort.key === k ? (sort.dir > 0 ? 'ascending' : 'descending') : 'none'}>
+      {children}<span className="arrow">{sort.key === k ? (sort.dir > 0 ? ' ▲' : ' ▼') : ' ↕'}</span>
+    </th>
+  );
   const tot = (arr) => arr.reduce((a, i) => a + Number(i.amount), 0);
   const essentials = inProject.filter((i) => i.section === 'Essentials');
 
@@ -58,15 +82,16 @@ export default function ProjectsView({ items, setItems, onError }) {
       <div className="card">
         <div className="pills" style={{ marginBottom: 12 }}>
           {SECTIONS.map((s) => <button key={s} className={`pill ${s === section ? 'on' : ''}`} onClick={() => setSection(s)}>{s}</button>)}
+          {sort.key && <button className="link" style={{ marginLeft: 8 }} onClick={() => setSort({ key: null, dir: 1 })}>reset to sheet order</button>}
         </div>
         <table className="list-table">
           <thead>
             <tr>
-              <th>{section === 'Payments' ? 'Payment' : section === 'Interiors' ? 'Phase' : 'Item'}</th>
-              {section === 'Payments' && <th>Date</th>}
+              <Th k="label">{section === 'Payments' ? 'Payment' : section === 'Interiors' ? 'Phase' : 'Item'}</Th>
+              {section === 'Payments' && <Th k="date">Date</Th>}
               {section === 'Essentials' && <th className="r">Cost × qty</th>}
-              {section !== 'Interiors' && <th>Paid by</th>}
-              <th className="r">Amount</th>
+              {section !== 'Interiors' && <Th k="payer">Paid by</Th>}
+              <Th k="amount" right>Amount</Th>
               <th />
             </tr>
           </thead>
